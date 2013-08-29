@@ -16,7 +16,7 @@ from django.views.decorators.csrf import csrf_exempt
 from social_auth.utils import sanitize_redirect, setting, \
                               backend_setting, clean_partial_pipeline
 from social_auth.decorators import dsa_view, disconnect_view
-
+from social_auth.exceptions import AuthException
 
 DEFAULT_REDIRECT = setting('SOCIAL_AUTH_LOGIN_REDIRECT_URL',
                            setting('LOGIN_REDIRECT_URL'))
@@ -46,8 +46,11 @@ def associate_complete(request, backend, *args, **kwargs):
     """Authentication complete process"""
     # pop redirect value before the session is trashed on login()
     redirect_value = request.session.get(REDIRECT_FIELD_NAME, '')
-    user = auth_complete(request, backend, request.user, *args, **kwargs)
-
+    try:
+        user = auth_complete(request, backend, request.user, *args, **kwargs)
+    except AuthException:
+        user = None
+        
     if not user:
         url = backend_setting(backend, 'LOGIN_ERROR_URL', LOGIN_ERROR_URL)
     elif isinstance(user, HttpResponse):
@@ -104,7 +107,10 @@ def complete_process(request, backend, *args, **kwargs):
     # pop redirect value before the session is trashed on login()
     redirect_value = request.session.get(REDIRECT_FIELD_NAME, '') or \
                      request.REQUEST.get(REDIRECT_FIELD_NAME, '')
-    user = auth_complete(request, backend, *args, **kwargs)
+    try:
+        user = auth_complete(request, backend, *args, **kwargs)
+    except AuthException:
+        user = None
 
     if isinstance(user, HttpResponse):
         return user
